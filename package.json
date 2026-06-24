@@ -1,0 +1,16 @@
+{
+  "name": "teacher-agent-platform",
+  "private": true,
+  "scripts": {
+    "dev:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-backend.ps1",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "lint:backend": "cd backend && ..\\.venv\\Scripts\\python.exe -m ruff check .",
+    "lint:frontend": "npm --prefix frontend run lint",
+    "format:backend": "cd backend && ..\\.venv\\Scripts\\python.exe -m ruff format . && ..\\.venv\\Scripts\\python.exe -m ruff check . --fix",
+    "format:frontend": "npm --prefix frontend run format",
+    "test:backend": "cd backend && ..\\.venv\\Scripts\\python.exe -m pytest tests",
+    "typecheck:frontend": "npm --prefix frontend run typecheck",
+    "check": "npm run lint:frontend && npm run typecheck:frontend && npm run lint:backend && npm run test:backend"
+  }
+}
