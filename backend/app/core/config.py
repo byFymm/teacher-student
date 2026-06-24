@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "Teacher Agent Platform"
     api_prefix: str = "/api/v1"
     environment: str = "local"
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"])
 
     database_url: str = "postgresql+asyncpg://teacher:teacher@localhost:5432/teacher"
     redis_url: str = "redis://localhost:6379/0"
