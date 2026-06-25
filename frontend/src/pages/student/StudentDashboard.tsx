@@ -1,3 +1,4 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   BookMarked,
@@ -7,14 +8,107 @@ import {
   ClipboardCheck,
   Flame,
   MessageSquareText,
+  Send,
   Target,
 } from "lucide-react";
+import { FormEvent, useState } from "react";
 
 import { masteryPoints, studentCourses, studentStats, studentTasks } from "../../data/platform";
+import {
+  getStudentWorkspace,
+  sendChatQuestion,
+  updateStudentTask,
+  type StudentWorkspace,
+} from "../../services/api/platform";
 
 const statIcons = [BookMarked, ClipboardCheck, MessageSquareText, Flame];
 
+const fallbackStudentWorkspace: StudentWorkspace = {
+  stats: studentStats,
+  courses: studentCourses.map((course, index) => ({
+    id: `fallback-course-${index}`,
+    name: course.name,
+    teacher: course.teacher,
+    progress: course.progress,
+    next_action: course.nextAction,
+    mastery: course.mastery,
+  })),
+  tasks: studentTasks.map((task, index) => ({
+    id: `fallback-task-${index}`,
+    title: task.title,
+    task_type: task.type,
+    due: task.due,
+    status: task.status,
+  })),
+  mastery_points: masteryPoints,
+  chat_messages: [
+    {
+      id: "fallback-chat-user",
+      role: "user",
+      content: "指数函数和幂函数怎么区分？",
+      time: "刚刚",
+    },
+    {
+      id: "fallback-chat-assistant",
+      role: "assistant",
+      content: "先看自变量的位置：指数函数的变量在指数上，幂函数的变量在底数上。",
+      time: "刚刚",
+    },
+  ],
+  recommendation: "优先复习受力分析与函数图像，先做基础题，再进入 AI 讲解模式。",
+};
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "操作失败，请稍后重试";
+}
+
 export function StudentDashboard() {
+  const queryClient = useQueryClient();
+  const [question, setQuestion] = useState("指数函数怎么判断单调性？");
+  const [chatNotice, setChatNotice] = useState("");
+
+  const { data, isError, isLoading } = useQuery({
+    queryKey: ["student-workspace"],
+    queryFn: getStudentWorkspace,
+  });
+
+  const workspace = data ?? fallbackStudentWorkspace;
+  const chatMessages = workspace.chat_messages.slice(-6);
+
+  const chatMutation = useMutation({
+    mutationFn: sendChatQuestion,
+    onSuccess: (response) => {
+      setQuestion("");
+      setChatNotice("AI 学习助手已回答");
+      queryClient.setQueryData<StudentWorkspace>(["student-workspace"], (current) => {
+        if (!current) {
+          return current;
+        }
+        return { ...current, chat_messages: response.messages };
+      });
+      void queryClient.invalidateQueries({ queryKey: ["student-workspace"] });
+    },
+    onError: (error) => setChatNotice(getErrorMessage(error)),
+  });
+
+  const taskMutation = useMutation({
+    mutationFn: ({ taskId, status }: { taskId: string; status: string }) =>
+      updateStudentTask(taskId, status),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["student-workspace"] });
+    },
+  });
+
+  function handleChatSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion) {
+      setChatNotice("请先输入问题");
+      return;
+    }
+    chatMutation.mutate(trimmedQuestion);
+  }
+
   return (
     <section className="page-stack student-dashboard" aria-labelledby="student-title">
       <header className="page-header hero-header compact-hero">
@@ -24,13 +118,16 @@ export function StudentDashboard() {
         </div>
         <button className="command-button" type="button">
           <BotMessageSquare aria-hidden="true" size={18} />
-          打开 AI 学习助手
+          AI 学习助手
         </button>
       </header>
 
+      {isError ? <p className="form-status warning">后端暂时不可用，当前展示本地演示数据。</p> : null}
+      {isLoading ? <p className="form-status">正在同步学习数据...</p> : null}
+
       <div className="metric-grid four-columns">
-        {studentStats.map((stat, index) => {
-          const Icon = statIcons[index];
+        {workspace.stats.map((stat, index) => {
+          const Icon = statIcons[index] ?? BookMarked;
           return (
             <article key={stat.label} className={`metric-card tone-${stat.tone}`}>
               <span className="metric-icon">
@@ -54,8 +151,8 @@ export function StudentDashboard() {
           </div>
 
           <div className="course-list">
-            {studentCourses.map((course) => (
-              <article key={course.name} className="course-row">
+            {workspace.courses.map((course) => (
+              <article key={course.id} className="course-row">
                 <div>
                   <h3>{course.name}</h3>
                   <p>{course.teacher} · {course.mastery}</p>
@@ -69,7 +166,7 @@ export function StudentDashboard() {
                 <button className="row-action" type="button" aria-label={`进入 ${course.name}`}>
                   <ArrowRight aria-hidden="true" size={18} />
                 </button>
-                <small>{course.nextAction}</small>
+                <small>{course.next_action}</small>
               </article>
             ))}
           </div>
@@ -83,13 +180,26 @@ export function StudentDashboard() {
             </div>
             <Brain aria-hidden="true" size={20} />
           </div>
-          <div className="chat-preview">
-            <div className="chat-bubble user">指数函数和幂函数怎么区分？</div>
-            <div className="chat-bubble assistant">
-              先看自变量的位置：指数函数的变量在指数上，幂函数的变量在底数上。你可以用图像增长速度再判断一次。
-            </div>
+          <div className="chat-preview" aria-live="polite">
+            {chatMessages.map((message) => (
+              <div key={message.id} className={`chat-bubble ${message.role}`}>
+                {message.content}
+              </div>
+            ))}
           </div>
-          <button className="secondary-command" type="button">继续追问</button>
+          <form className="chat-form" onSubmit={handleChatSubmit}>
+            <textarea
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder="输入课程问题"
+              rows={3}
+            />
+            <button className="command-button full-width" type="submit" disabled={chatMutation.isPending}>
+              <Send aria-hidden="true" size={18} />
+              {chatMutation.isPending ? "思考中" : "发送问题"}
+            </button>
+          </form>
+          {chatNotice ? <p className="form-status success">{chatNotice}</p> : null}
         </section>
 
         <section className="work-panel">
@@ -101,15 +211,26 @@ export function StudentDashboard() {
             <ClipboardCheck aria-hidden="true" size={20} />
           </div>
           <div className="task-list">
-            {studentTasks.map((task) => (
-              <article key={task.title} className="task-row">
-                <span>
-                  <strong>{task.title}</strong>
-                  <small>{task.type} · {task.due}</small>
-                </span>
-                <em>{task.status}</em>
-              </article>
-            ))}
+            {workspace.tasks.map((task) => {
+              const nextStatus = task.status === "已完成" ? "进行中" : "已完成";
+              return (
+                <article key={task.id} className="task-row">
+                  <span>
+                    <strong>{task.title}</strong>
+                    <small>{task.task_type} · {task.due}</small>
+                  </span>
+                  <em className={task.status === "已完成" ? "done" : ""}>{task.status}</em>
+                  <button
+                    className="task-action"
+                    type="button"
+                    disabled={taskMutation.isPending}
+                    onClick={() => taskMutation.mutate({ taskId: task.id, status: nextStatus })}
+                  >
+                    {task.status === "已完成" ? "重开" : "完成"}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -122,7 +243,7 @@ export function StudentDashboard() {
             <Target aria-hidden="true" size={20} />
           </div>
           <div className="mastery-list">
-            {masteryPoints.map((point) => (
+            {workspace.mastery_points.map((point) => (
               <div key={point.label} className="mastery-row">
                 <span>{point.label}</span>
                 <div className="progress-track">
@@ -144,7 +265,7 @@ export function StudentDashboard() {
           </div>
           <div className="recommendation-card">
             <strong>优先复习受力分析与函数图像</strong>
-            <p>建议先完成 12 道基础题，再进入 AI 讲解模式，对比自己的解题步骤。</p>
+            <p>{workspace.recommendation}</p>
           </div>
         </section>
       </div>

@@ -29,7 +29,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -1107,6 +1108,100 @@ button {
   flex: 1;
 }
 
+
+.panel-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panel-form label,
+.chat-form {
+  display: grid;
+  gap: 8px;
+}
+
+.panel-form label span,
+.chat-form span {
+  color: #40536b;
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.panel-form input,
+.panel-form select,
+.chat-form textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #ccd8e4;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #17202a;
+  outline: none;
+  background: #ffffff;
+}
+
+.chat-form textarea {
+  min-height: 88px;
+  padding: 10px 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.panel-form input:focus,
+.panel-form select:focus,
+.chat-form textarea:focus {
+  border-color: #1aa889;
+  box-shadow: 0 0 0 3px rgba(26, 168, 137, 0.14);
+}
+
+.with-divider {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eef3f7;
+}
+
+.form-status.success {
+  color: #12856d;
+}
+
+.form-status.warning {
+  color: #a66500;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.task-action {
+  min-height: 32px;
+  border: 1px solid #d7e1ec;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #153047;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 820;
+}
+
+.task-row em.done {
+  background: #e6f7f2;
+  color: #12856d;
+}
+
+.provider-row {
+  flex-wrap: wrap;
+}
+
+.provider-row .task-action {
+  min-width: 66px;
+}
+
+.chat-form {
+  margin-top: 8px;
+}
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 236px minmax(0, 1fr);
